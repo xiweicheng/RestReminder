@@ -38,9 +38,7 @@
 3. （可选）校验完整性：`shasum -a 256 RestReminder-1.1.dmg`，输出应与上表一致；
 4. 覆盖安装旧版本前，请先退出 RestReminder（菜单栏图标 → 退出）。
 
-> 🔒 **私有仓库说明**：本仓库目前为 **Private**，Release 及其 DMG 附件仅仓库所有者与受邀协作者**登录 GitHub 后**可见、可下载。如需让他人下载，二选一：
-> - 将仓库设为 Public（GitHub 网页：`Settings → General → Danger Zone → Change repository visibility`）；
-> - 或直接把 DMG 文件发送给对方（本地路径：仓库根目录 `RestReminder-1.1.dmg`）。
+> 🌍 **仓库可见性**：本仓库已设为 **Public**，任何人无需登录即可从 [Releases 页面](https://github.com/xiweicheng/RestReminder/releases) 下载 DMG；若日后改回 Private，Release 附件将仅对仓库所有者与受邀协作者可见。
 
 ### 发布新版本（维护者）
 
