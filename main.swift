@@ -2,10 +2,11 @@
 // main.swift — RestReminder 久坐休息提醒（macOS 菜单栏小工具）
 //
 // 纯 Swift + AppKit 单文件实现：
-//   1. NSStatusItem 菜单栏：开始/暂停、间隔设置(5/10/20/30/45/60分钟)、立即休息、开机启动、退出
+//   1. NSStatusItem 菜单栏：开始/暂停、间隔设置(5/10/20/30/45/60分钟)、立即休息、语言切换、开机启动、退出
 //   2. 桌面悬浮倒计时小窗：NSPanel 置顶、不抢焦点、可拖动、屏幕边缘自动吸附、位置记忆
 //   3. 到点系统通知（UNUserNotificationCenter）+ 休息提示
 //   4. 休息时全屏柔和渐变遮罩，提示站立/拉伸活动，可一键跳过
+//   5. 中英双语（L10n 文案层 + AppLanguage 语言管理：跟随系统/中文/English）
 //
 // 构建:  bash build.sh
 // 运行:  open RestReminder.app
@@ -40,6 +41,89 @@ func mmss(_ seconds: Int) -> String {
     return String(format: "%02d:%02d", v / 60, v % 60)
 }
 
+// MARK: - 多语言（L10n）
+
+/// 用户可选语言：跟随系统 / 简体中文 / English
+enum AppLanguage: String, CaseIterable {
+    case system
+    case zhHans
+    case en
+
+    /// UserDefaults 存储键
+    static let storageKey = "appLanguage"
+
+    /// 手动选择的语言（.system 表示跟随系统），持久化到 UserDefaults
+    static var selected: AppLanguage {
+        get { AppLanguage(rawValue: UserDefaults.standard.string(forKey: storageKey) ?? "") ?? .system }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: storageKey) }
+    }
+
+    /// 当前实际生效语言：手动选择优先；跟随系统时读系统首选语言（zh 开头→中文，其余→英文）
+    static var resolved: AppLanguage {
+        if selected != .system { return selected }
+        let preferred = Locale.preferredLanguages.first ?? "en"
+        return preferred.hasPrefix("zh") ? .zhHans : .en
+    }
+
+    /// 语言菜单里展示的名称（各语言自称，便于辨认）
+    var displayName: String {
+        switch self {
+        case .system: return AppLanguage.resolved == .zhHans ? "跟随系统" : "Follow System"
+        case .zhHans: return "简体中文"
+        case .en:     return "English"
+        }
+    }
+}
+
+/// L10n 文案表：全部 UI 文案集中于此，按当前生效语言取值；带参数的文案用模板函数。
+/// 所有取值都是实时计算，切换语言后下一次取值即生效。
+enum L10n {
+    /// 当前生效语言是否为简体中文
+    static var isChinese: Bool { AppLanguage.resolved == .zhHans }
+
+    // MARK: 菜单栏图标 tooltip
+    static var tooltip: String { isChinese ? "RestReminder 休息提醒" : "RestReminder break reminder" }
+
+    // MARK: 悬浮倒计时窗
+    static var panelNextBreak: String { isChinese ? "距下次休息" : "Next break in" }
+    static var panelPaused: String { isChinese ? "已暂停" : "Paused" }
+    static var panelResting: String { isChinese ? "🌿 休息中" : "🌿 Resting" }
+    static func panelRestSeconds(_ seconds: Int) -> String { isChinese ? "还剩 \(seconds) 秒" : "\(seconds)s left" }
+
+    // MARK: 菜单状态头
+    static func menuRestingHeader(_ seconds: Int) -> String { isChinese ? "🌿 休息中 — 还剩 \(seconds) 秒" : "🌿 Resting — \(seconds)s left" }
+    static func menuPausedHeader(_ time: String) -> String { isChinese ? "⏸ 已暂停 — 剩余 \(time)" : "⏸ Paused — \(time) left" }
+    static func menuWorkingHeader(_ time: String) -> String { isChinese ? "☕ 工作中 — 距下次休息 \(time)" : "☕ Working — next break in \(time)" }
+
+    // MARK: 菜单项
+    static var menuStart: String { isChinese ? "▶️ 开始提醒" : "▶️ Start Reminders" }
+    static var menuPause: String { isChinese ? "⏸ 暂停提醒" : "⏸ Pause Reminders" }
+    static var menuRestNow: String { isChinese ? "🌿 立即休息" : "🌿 Take a Break Now" }
+    static func menuMinutes(_ m: Int) -> String { isChinese ? "\(m) 分钟" : "\(m) min" }
+    static var menuInterval: String { isChinese ? "⏱ 休息间隔" : "⏱ Break Interval" }
+    static var menuLaunchAtLogin: String { isChinese ? "🚀 开机自动启动" : "🚀 Launch at Login" }
+    static var menuGitHub: String { isChinese ? "🌐 项目主页（GitHub）" : "🌐 Project Homepage (GitHub)" }
+    static var menuQuit: String { isChinese ? "退出 RestReminder" : "Quit RestReminder" }
+
+    // MARK: 语言子菜单
+    /// 子菜单标题固定双语展示：无论当前显示语言是哪种，都能一眼找到语言入口
+    static var menuLanguage: String { "🌐 语言 / Language" }
+
+    // MARK: 全屏休息遮罩
+    static var overlayTitle: String { isChinese ? "🌿 该休息啦" : "🌿 Time for a Break" }
+    static var overlaySubtitle: String { isChinese ? "站起来走一走，伸个懒腰，让颈椎和腰椎放松一下" : "Stand up and stretch — give your neck and back a break" }
+    static func overlayCountdown(_ seconds: Int) -> String { isChinese ? "休息还剩 \(seconds) 秒" : "Rest ends in \(seconds)s" }
+    static var overlayTips: String { isChinese ? "👁 远眺放松眼睛 · 🔄 缓缓转脖子 · 💪 耸肩绕肩 · 💧 喝口水" : "👁 Look into the distance · 🔄 Roll your neck · 💪 Shrug and roll shoulders · 💧 Sip some water" }
+    static var overlaySkip: String { isChinese ? "提前结束休息" : "End Break Early" }
+
+    // MARK: 系统通知
+    static var notificationTitle: String { isChinese ? "🌿 该休息啦" : "🌿 Time for a Break" }
+    static func notificationBody(_ minutes: Int) -> String { isChinese ? "已连续工作 \(minutes) 分钟，站起来活动一下吧！" : "You've been working for \(minutes) minutes — time to move!" }
+}
+
+/// 悬浮窗状态语义（用于着色等样式判断，与 UI 文案字符串解耦）
+enum CountdownState { case working, resting, paused }
+
 /// 静默执行 launchctl，返回退出码
 @discardableResult
 func runLaunchctl(_ args: [String]) -> Int32 {
@@ -57,7 +141,7 @@ func runLaunchctl(_ args: [String]) -> Int32 {
 
 final class CountdownView: NSView {
     let timeLabel = NSTextField(labelWithString: "30:00")
-    let stateLabel = NSTextField(labelWithString: "距下次休息")
+    let stateLabel = NSTextField(labelWithString: L10n.panelNextBreak)
 
     private var dragMouseStart: NSPoint?
     private var dragOrigin: NSPoint?
@@ -256,22 +340,22 @@ final class CountdownView: NSView {
         suppressHoverUntil = Date().addingTimeInterval(0.6)  // 松手位置压住小条时不立即弹开
     }
 
-    func update(time: String, state: String, progress: Double? = nil) {
+    func update(time: String, state: String, kind: CountdownState, progress: Double? = nil) {
         timeLabel.stringValue = time
         stateLabel.stringValue = state
         if let p = progress { barProgress = p; updateBarFill() }
         // 状态行按状态着色：休息中薄荷绿点缀、暂停琥珀色、工作中柔白
-        let resting = time.contains("休息中")
+        let resting = kind == .resting           // 语义状态判断，与文案字符串解耦
         // 收起态进度条颜色随状态同步：休息中薄荷绿 / 暂停琥珀 / 工作中柔白
         barFill.layer?.backgroundColor = resting
             ? NSColor(calibratedRed: 0.62, green: 0.96, blue: 0.80, alpha: 0.95).cgColor
-            : (state.contains("暂停")
+            : (kind == .paused
                ? NSColor(calibratedRed: 1.0, green: 0.84, blue: 0.55, alpha: 0.9).cgColor
                : NSColor.white.withAlphaComponent(0.55).cgColor)
         if resting {
             stateLabel.textColor = NSColor(calibratedRed: 0.62, green: 0.96, blue: 0.80, alpha: 1)
             layer?.borderColor = NSColor(calibratedRed: 0.62, green: 0.96, blue: 0.80, alpha: 0.45).cgColor
-        } else if state.contains("暂停") {
+        } else if kind == .paused {
             stateLabel.textColor = NSColor(calibratedRed: 1.0, green: 0.84, blue: 0.55, alpha: 1)
             layer?.borderColor = NSColor.white.withAlphaComponent(0.16).cgColor
         } else {
@@ -440,7 +524,11 @@ final class CountdownPanel: NSPanel {
 
 final class RestOverlayView: NSView {
     var onSkip: (() -> Void)?
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let subtitleLabel = NSTextField(labelWithString: "")
     private let countdownLabel = NSTextField(labelWithString: "")
+    private let tipsLabel = NSTextField(labelWithString: "")
+    private let skipButton = NSButton(title: "", target: nil, action: nil)
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -476,28 +564,25 @@ final class RestOverlayView: NSView {
         let ink = NSColor(calibratedRed: 0.13, green: 0.24, blue: 0.34, alpha: 1)   // 深青蓝墨色，柔和不刺眼
         let softInk = ink.withAlphaComponent(0.74)
 
-        let title = NSTextField(labelWithString: "🌿 该休息啦")
-        title.font = NSFont.systemFont(ofSize: 46, weight: .bold)
-        title.textColor = ink
+        titleLabel.font = NSFont.systemFont(ofSize: 46, weight: .bold)
+        titleLabel.textColor = ink
 
-        let subtitle = NSTextField(labelWithString: "站起来走一走，伸个懒腰，让颈椎和腰椎放松一下")
-        subtitle.font = NSFont.systemFont(ofSize: 21, weight: .medium)
-        subtitle.textColor = softInk
+        subtitleLabel.font = NSFont.systemFont(ofSize: 21, weight: .medium)
+        subtitleLabel.textColor = softInk
 
         countdownLabel.font = NSFont.monospacedDigitSystemFont(ofSize: 17, weight: .semibold)
         countdownLabel.textColor = softInk
-        countdownLabel.stringValue = "休息还剩 \(Config.restSeconds) 秒"
 
-        let tips = NSTextField(labelWithString: "👁 远眺放松眼睛 · 🔄 缓缓转脖子 · 💪 耸肩绕肩 · 💧 喝口水")
-        tips.font = NSFont.systemFont(ofSize: 15)
-        tips.textColor = softInk
+        tipsLabel.font = NSFont.systemFont(ofSize: 15)
+        tipsLabel.textColor = softInk
 
-        let skip = NSButton(title: "提前结束休息", target: self, action: #selector(skipTapped))
-        skip.bezelStyle = .rounded
-        skip.controlSize = .large
-        skip.font = NSFont.systemFont(ofSize: 14, weight: .medium)
+        skipButton.bezelStyle = .rounded
+        skipButton.controlSize = .large
+        skipButton.font = NSFont.systemFont(ofSize: 14, weight: .medium)
+        skipButton.target = self
+        skipButton.action = #selector(skipTapped)
 
-        let stack = NSStackView(views: [title, subtitle, countdownLabel, tips, skip])
+        let stack = NSStackView(views: [titleLabel, subtitleLabel, countdownLabel, tipsLabel, skipButton])
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 16
@@ -507,12 +592,23 @@ final class RestOverlayView: NSView {
             stack.centerXAnchor.constraint(equalTo: centerXAnchor),
             stack.centerYAnchor.constraint(equalTo: centerYAnchor)
         ])
+
+        refreshText(remainingSeconds: Config.restSeconds)    // 首次文案；语言切换时也会重走此方法
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     func update(remainingSeconds: Int) {
-        countdownLabel.stringValue = "休息还剩 \(max(0, remainingSeconds)) 秒"
+        countdownLabel.stringValue = L10n.overlayCountdown(max(0, remainingSeconds))
+    }
+
+    /// 刷新全部文案（语言切换后，遮罩若正在显示则调用此方法即时生效，无需重建窗口）
+    func refreshText(remainingSeconds: Int) {
+        titleLabel.stringValue = L10n.overlayTitle
+        subtitleLabel.stringValue = L10n.overlaySubtitle
+        tipsLabel.stringValue = L10n.overlayTips
+        skipButton.title = L10n.overlaySkip
+        update(remainingSeconds: remainingSeconds)
     }
 
     @objc private func skipTapped() { onSkip?() }
@@ -621,18 +717,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         menu.removeAllItems()
 
         let header: String
-        if isResting { header = "🌿 休息中 — 还剩 \(max(0, restRemaining)) 秒" }
-        else if isPaused { header = "⏸ 已暂停 — 剩余 \(mmss(remaining))" }
-        else { header = "☕ 工作中 — 距下次休息 \(mmss(remaining))" }
+        if isResting { header = L10n.menuRestingHeader(max(0, restRemaining)) }
+        else if isPaused { header = L10n.menuPausedHeader(mmss(remaining)) }
+        else { header = L10n.menuWorkingHeader(mmss(remaining)) }
         menu.addItem(NSMenuItem(title: header, action: nil, keyEquivalent: ""))
         menu.addItem(.separator())
 
-        let toggle = NSMenuItem(title: isPaused ? "▶️ 开始提醒" : "⏸ 暂停提醒",
+        let toggle = NSMenuItem(title: isPaused ? L10n.menuStart : L10n.menuPause,
                                 action: #selector(togglePause), keyEquivalent: "p")
         toggle.target = self
         menu.addItem(toggle)
 
-        let restNow = NSMenuItem(title: "🌿 立即休息",
+        let restNow = NSMenuItem(title: L10n.menuRestNow,
                                  action: #selector(restNow), keyEquivalent: "r")
         restNow.target = self
         restNow.isEnabled = !isResting
@@ -642,29 +738,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let intervalMenu = NSMenu()
         intervalMenu.autoenablesItems = false
         for m in Config.intervals {
-            let it = NSMenuItem(title: "\(m) 分钟", action: #selector(setInterval(_:)), keyEquivalent: "")
+            let it = NSMenuItem(title: L10n.menuMinutes(m), action: #selector(setInterval(_:)), keyEquivalent: "")
             it.target = self
             it.state = (m == intervalMinutes) ? .on : .off
             it.representedObject = m
             intervalMenu.addItem(it)
         }
-        let intervalItem = NSMenuItem(title: "⏱ 休息间隔", action: nil, keyEquivalent: "")
+        let intervalItem = NSMenuItem(title: L10n.menuInterval, action: nil, keyEquivalent: "")
         intervalItem.submenu = intervalMenu
         menu.addItem(intervalItem)
+
+        // 🌐 语言 / Language 子菜单：跟随系统 / 简体中文 / English，✓ 标记当前选择
+        let languageMenu = NSMenu()
+        languageMenu.autoenablesItems = false
+        for lang in AppLanguage.allCases {
+            let it = NSMenuItem(title: lang.displayName, action: #selector(setLanguage(_:)), keyEquivalent: "")
+            it.target = self
+            it.state = (lang == AppLanguage.selected) ? .on : .off
+            it.representedObject = lang.rawValue
+            languageMenu.addItem(it)
+        }
+        let languageItem = NSMenuItem(title: L10n.menuLanguage, action: nil, keyEquivalent: "")
+        languageItem.submenu = languageMenu
+        menu.addItem(languageItem)
         menu.addItem(.separator())
 
-        let launch = NSMenuItem(title: "🚀 开机自动启动",
+        let launch = NSMenuItem(title: L10n.menuLaunchAtLogin,
                                 action: #selector(toggleLaunchAtLogin), keyEquivalent: "l")
         launch.target = self
         launch.state = launchAtLoginEnabled ? .on : .off
         menu.addItem(launch)
         menu.addItem(.separator())
 
-        let about = NSMenuItem(title: "🌐 项目主页（GitHub）", action: #selector(openGitHubRepo), keyEquivalent: "")
+        let about = NSMenuItem(title: L10n.menuGitHub, action: #selector(openGitHubRepo), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
 
-        menu.addItem(NSMenuItem(title: "退出 RestReminder",
+        menu.addItem(NSMenuItem(title: L10n.menuQuit,
                                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
     }
 
@@ -681,6 +791,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         intervalMinutes = m
         if !isResting { remaining = m * 60 }                 // 切换间隔后重新计时
         refreshUI()
+    }
+
+    @objc private func setLanguage(_ sender: NSMenuItem) {
+        guard let raw = sender.representedObject as? String,
+              let lang = AppLanguage(rawValue: raw),
+              lang != AppLanguage.selected else { return }   // 重复点击当前项不做事
+        AppLanguage.selected = lang                          // 写入 UserDefaults，重启后仍保持
+        applyLanguageChange()
+    }
+
+    /// 语言切换立即生效，无需重启应用：
+    /// 1) 强制重建菜单（平时每次展开菜单本就会重建，此处双保险）
+    /// 2) 悬浮倒计时窗文案 + 菜单栏 tooltip 即时刷新
+    /// 3) 全屏休息遮罩若正在显示，同步刷新其全部文案
+    private func applyLanguageChange() {
+        if let menu = statusItem?.menu { menuNeedsUpdate(menu) }
+        refreshUI()
+        if isResting {
+            overlays.forEach { $0.overlayView.refreshText(remainingSeconds: restRemaining) }
+        }
     }
 
     @objc private func openGitHubRepo() {
@@ -767,8 +897,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
     private func sendRestNotification() {
         guard let center = notificationCenter else { return }
         let content = UNMutableNotificationContent()
-        content.title = "🌿 该休息啦"
-        content.body = "已连续工作 \(intervalMinutes) 分钟，站起来活动一下吧！"
+        content.title = L10n.notificationTitle
+        content.body = L10n.notificationBody(intervalMinutes)
         content.sound = .default
         let id = UUID().uuidString
         lastNotificationID = id
@@ -818,11 +948,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let left = isResting ? Double(max(0, restRemaining)) : Double(max(0, remaining))
         let progress = min(max(left / total, 0), 1)          // 收起小条上的剩余时间比例
         if isResting {
-            v.update(time: "🌿 休息中", state: "还剩 \(max(0, restRemaining)) 秒", progress: progress)
+            v.update(time: L10n.panelResting, state: L10n.panelRestSeconds(max(0, restRemaining)), kind: .resting, progress: progress)
         } else if isPaused {
-            v.update(time: mmss(remaining), state: "已暂停", progress: progress)
+            v.update(time: mmss(remaining), state: L10n.panelPaused, kind: .paused, progress: progress)
         } else {
-            v.update(time: mmss(remaining), state: "距下次休息", progress: progress)
+            v.update(time: mmss(remaining), state: L10n.panelNextBreak, kind: .working, progress: progress)
         }
     }
 
@@ -837,7 +967,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             button.image = nil
             button.title = isResting ? "☕" : (isPaused ? "⏸" : "⏰")
         }
-        button.toolTip = "RestReminder 休息提醒"
+        button.toolTip = L10n.tooltip
     }
 
     private func refreshUI() {
