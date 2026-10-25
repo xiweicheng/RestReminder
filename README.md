@@ -21,6 +21,36 @@
   - 遮罩提示站立/��伸动作（远眺、转脖子、耸肩、喝水），带休息倒计时，可点「提前结束休息」跳过
 - ⚙️ 其他：间隔/暂停状态/悬浮窗位置持久化（UserDefaults）；防重复启动
 
+## 下载安装（Releases）
+
+不想自己编译？直接下载打包好的 DMG 安装包（v1.1 起包含「贴边吸附收起」与「关于菜单跳转 GitHub」改动）：
+
+**👉 前往 [Releases 页面](https://github.com/xiweicheng/RestReminder/releases) 下载最新版**
+
+| 版本 | 文件 | 大小 | SHA256 |
+|---|---|---|---|
+| v1.1 | `RestReminder-1.1.dmg` | 76 KB | `9214d013a395d19524b1efa3fd35a8f9c8b6499bb0c6d45aed941ebc3c96b2d5` |
+
+**安装步骤**
+
+1. 双击打开 DMG，将 **RestReminder.app** 拖入「应用程序」文件夹；
+2. 首次运行如遇 Gatekeeper 拦截（App 未签名）：在 App 上**右键 → 打开**，或前往 *系统设置 → 隐私与安全性 → 仍要打开*；
+3. （可选）校验完整性：`shasum -a 256 RestReminder-1.1.dmg`，输出应与上表一致；
+4. 覆盖安装旧版本前，请先退出 RestReminder（菜单栏图标 → 退出）。
+
+> 🔒 **私有仓库说明**：本仓库目前为 **Private**，Release 及其 DMG 附件仅仓库所有者与受邀协作者**登录 GitHub 后**可见、可下载。如需让他人下载，二选一：
+> - 将仓库设为 Public（GitHub 网页：`Settings → General → Danger Zone → Change repository visibility`）；
+> - 或直接把 DMG 文件发送给对方（本地路径：仓库根目录 `RestReminder-1.1.dmg`）。
+
+### 发布新版本（维护者）
+
+```bash
+bash release.sh 1.2              # 构建 → tag → Release → 上传 → 核验，一键完成
+bash release.sh 1.2 --reuse-dmg  # 复用已构建的 DMG 重发（幂等，可安全重跑）
+```
+
+脚本特性：gh 优先、网络抖动自动降级 curl + dig 多源钉 IP 自愈；token 仅从 `gh auth token` 读取、fail-fast 且全程脱敏（`-H @文件` 携带，零明文回显）；Release 正文自动复用 `release_notes_v<版本>.md` 模板；重复运行幂等（已存在则复用、同名附件先删后传）。
+
 ## 构建与运行
 
 ```bash
@@ -52,7 +82,11 @@ open RestReminder.app
 RestReminder/
 ├── main.swift              # 全部实现（单文件）
 ├── Info.plist              # App 配置（LSUIElement 菜单栏应用）
-├── build.sh                # 一键构建脚本
+├── build.sh                # 一键构建 App
+├── package.sh              # 一键构建 + DMG 打包
+├── release.sh              # 一键发布 GitHub Release（gh 优先→钉 IP 兜底）
+├── git-sync.sh             # 一键 git 提交推送
+├── release_notes_v1.1.md   # v1.1 Release 正文模板（release.sh 自动复用）
 ├── README.md
 └── RestReminder.app/       # 构建产物
     └── Contents/
