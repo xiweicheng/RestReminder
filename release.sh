@@ -84,10 +84,10 @@ init_curl_channel() {
   up_curl()  { curl -sS --resolve "uploads.github.com:443:$UP_IP" -m 600 "$@"; }
   ( umask 077; printf 'Authorization: Bearer %s\n' "$TOKEN" > "$TMP/auth_hdr" )
   CODE="$(api_curl -o "$TMP/user.json" -w '%{http_code}' -H @"$TMP/auth_hdr" "https://api.github.com/user")"
-  [ "$CODE" = "200" ] || die "token fail-fast：GET /user HTTP $CODE（token 无效或过期）"
+  [ "$CODE" = "200" ] || die "token fail-fast：GET /user HTTP ${CODE}（token 无效或过期）"
   LOGIN="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["login"])' "$TMP/user.json")"
-  [ "$LOGIN" = "$OWNER" ] || die "token fail-fast：token 归属 $LOGIN ≠ $OWNER，拒绝发布"
-  echo "   ✅ curl 通道就绪（api=$API_IP uploads=$UP_IP，token 校验通过 login=$LOGIN）"
+  [ "$LOGIN" = "$OWNER" ] || die "token fail-fast：token 归属 $LOGIN ≠ ${OWNER}，拒绝发布"
+  echo "   ✅ curl 通道就绪（api=$API_IP uploads=${UP_IP}，token 校验通过 login=${LOGIN}）"
 }
 
 # ---------- ⓪ 前置检查 + token fail-fast ----------
@@ -106,8 +106,8 @@ git diff-index --quiet HEAD -- || die "工作区有未提交改动 —— 发布
 # ---------- ① 构建 DMG ----------
 step "① 安装包 $DMG"
 if [ "$SKIP_BUILD" = 1 ]; then
-  [ -f "$DMG" ] || die "--reuse-dmg：未找到 $DMG，请先 bash package.sh $VERSION"
-  echo "   复用现有 $DMG（跳过构建）"
+  [ -f "$DMG" ] || die "--reuse-dmg：未找到 ${DMG}，请先 bash package.sh $VERSION"
+  echo "   复用现有 ${DMG}（跳过构建）"
 else
   bash package.sh "$VERSION" >/dev/null
 fi
@@ -150,7 +150,7 @@ echo "   正文来源: $([ -f "$NOTES_FILE" ] && echo "$NOTES_FILE 模板" || ec
 step "③ 通道探测（gh 优先，8s 短超时）"
 MODE=""
 if LOGIN="$(with_timeout 8 gh api user -q .login 2>/dev/null)" && [ "$LOGIN" = "$OWNER" ]; then
-  MODE="gh"; echo "   ✅ gh 通道可用（login=$LOGIN）"
+  MODE="gh"; echo "   ✅ gh 通道可用（login=${LOGIN}）"
 else
   echo "   ⚠️ gh 通道不可用 → 降级 curl + dig 多源钉 IP 自愈"
   init_curl_channel
