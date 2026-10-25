@@ -29,19 +29,20 @@
 
 ## 下载安装（Releases）
 
-不想自己编译？直接下载打包好的 DMG 安装包（v1.1 起包含「贴边吸附收起」与「关于菜单跳转 GitHub」改动）：
+不想自己编译？直接下载打包好的 DMG 安装包（v1.2 起新增「中英双语界面」与菜单图标统一对齐；v1.1 包含「贴边吸附收起」与「关于菜单跳转 GitHub」改动）：
 
 **👉 前往 [Releases 页面](https://github.com/xiweicheng/RestReminder/releases) 下载最新版**
 
 | 版本 | 文件 | 大小 | SHA256 |
 |---|---|---|---|
+| v1.2 | `RestReminder-1.2.dmg` | 90 KB | `ef7d2441d61ab37e67b01b529386cde503a5840a4232807baab1bf556bc42e1e` |
 | v1.1 | `RestReminder-1.1.dmg` | 76 KB | `9214d013a395d19524b1efa3fd35a8f9c8b6499bb0c6d45aed941ebc3c96b2d5` |
 
 **安装步骤**
 
 1. 双击打开 DMG，将 **RestReminder.app** 拖入「应用程序」文件夹；
 2. 首次运行如遇 Gatekeeper 拦截（App 未签名）：在 App 上**右键 → 打开**，或前往 *系统设置 → 隐私与安全性 → 仍要打开*；
-3. （可选）校验完整性：`shasum -a 256 RestReminder-1.1.dmg`，输出应与上表一致；
+3. （可选）校验完整性：`shasum -a 256 RestReminder-1.2.dmg`，输出应与上表一致；
 4. 覆盖安装旧版本前，请先退出 RestReminder（菜单栏图标 → 退出）。
 
 > 🌍 **仓库可见性**：本仓库已设为 **Public**，任何人无需登录即可从 [Releases 页面](https://github.com/xiweicheng/RestReminder/releases) 下载 DMG；若日后改回 Private，Release 附件将仅对仓库所有者与受邀协作者可见。
