@@ -660,7 +660,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         menu.addItem(launch)
         menu.addItem(.separator())
 
-        let about = NSMenuItem(title: "关于 RestReminder", action: #selector(showAbout), keyEquivalent: "")
+        let about = NSMenuItem(title: "🌐 项目主页（GitHub）", action: #selector(openGitHubRepo), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
 
@@ -683,8 +683,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         refreshUI()
     }
 
-    @objc private func showAbout() {
-        NSApp.orderFrontStandardAboutPanel(options: [:])
+    @objc private func openGitHubRepo() {
+        guard let url = URL(string: "https://github.com/xiweicheng/RestReminder") else { return }
+        NSWorkspace.shared.open(url)   // 用系统默认浏览器打开仓库主页
     }
 
     // MARK: 计时
