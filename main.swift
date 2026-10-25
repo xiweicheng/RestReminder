@@ -91,23 +91,23 @@ enum L10n {
     static func panelRestSeconds(_ seconds: Int) -> String { isChinese ? "还剩 \(seconds) 秒" : "\(seconds)s left" }
 
     // MARK: 菜单状态头
-    static func menuRestingHeader(_ seconds: Int) -> String { isChinese ? "🌿 休息中 — 还剩 \(seconds) 秒" : "🌿 Resting — \(seconds)s left" }
-    static func menuPausedHeader(_ time: String) -> String { isChinese ? "⏸ 已暂停 — 剩余 \(time)" : "⏸ Paused — \(time) left" }
-    static func menuWorkingHeader(_ time: String) -> String { isChinese ? "☕ 工作中 — 距下次休息 \(time)" : "☕ Working — next break in \(time)" }
+    static func menuRestingHeader(_ seconds: Int) -> String { isChinese ? "休息中 — 还剩 \(seconds) 秒" : "Resting — \(seconds)s left" }
+    static func menuPausedHeader(_ time: String) -> String { isChinese ? "已暂停 — 剩余 \(time)" : "Paused — \(time) left" }
+    static func menuWorkingHeader(_ time: String) -> String { isChinese ? "工作中 — 距下次休息 \(time)" : "Working — next break in \(time)" }
 
     // MARK: 菜单项
-    static var menuStart: String { isChinese ? "▶️ 开始提醒" : "▶️ Start Reminders" }
-    static var menuPause: String { isChinese ? "⏸ 暂停提醒" : "⏸ Pause Reminders" }
-    static var menuRestNow: String { isChinese ? "🌿 立即休息" : "🌿 Take a Break Now" }
+    static var menuStart: String { isChinese ? "开始提醒" : "Start Reminders" }
+    static var menuPause: String { isChinese ? "暂停提醒" : "Pause Reminders" }
+    static var menuRestNow: String { isChinese ? "立即休息" : "Take a Break Now" }
     static func menuMinutes(_ m: Int) -> String { isChinese ? "\(m) 分钟" : "\(m) min" }
-    static var menuInterval: String { isChinese ? "⏱ 休息间隔" : "⏱ Break Interval" }
-    static var menuLaunchAtLogin: String { isChinese ? "🚀 开机自动启动" : "🚀 Launch at Login" }
-    static var menuGitHub: String { isChinese ? "🌐 项目主页（GitHub）" : "🌐 Project Homepage (GitHub)" }
+    static var menuInterval: String { isChinese ? "休息间隔" : "Break Interval" }
+    static var menuLaunchAtLogin: String { isChinese ? "开机自动启动" : "Launch at Login" }
+    static var menuGitHub: String { isChinese ? "项目主页（GitHub）" : "Project Homepage (GitHub)" }
     static var menuQuit: String { isChinese ? "退出 RestReminder" : "Quit RestReminder" }
 
     // MARK: 语言子菜单
     /// 子菜单标题固定双语展示：无论当前显示语言是哪种，都能一眼找到语言入口
-    static var menuLanguage: String { "🌐 语言 / Language" }
+    static var menuLanguage: String { "语言 / Language" }
 
     // MARK: 全屏休息遮罩
     static var overlayTitle: String { isChinese ? "🌿 该休息啦" : "🌿 Time for a Break" }
@@ -712,25 +712,57 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         refreshMenuBarIcon()
     }
 
+    /// 把 emoji 渲染成固定边长的菜单图标。
+    /// emoji 直接写在标题里时，不同字符（▶️/⏸/🌿…）的呈现形式（彩色 emoji / 文本字形）
+    /// 与宽度不一致，导致菜单项大小不齐、起点参差；改为统一 image 后，NSMenu 自动对齐图标列。
+    private func menuIcon(_ emoji: String) -> NSImage {
+        let side: CGFloat = 18
+        let img = NSImage(size: NSSize(width: side, height: side))
+        img.lockFocus()
+        let para = NSMutableParagraphStyle()
+        para.alignment = .center
+        let str = NSAttributedString(string: emoji, attributes: [
+            .font: NSFont.systemFont(ofSize: 14),
+            .paragraphStyle: para,
+        ])
+        let bounds = str.boundingRect(with: NSSize(width: side, height: side), options: [.usesLineFragmentOrigin])
+        str.draw(in: NSRect(x: 0, y: (side - bounds.height) / 2, width: side, height: side))
+        img.unlockFocus()
+        img.isTemplate = false   // 保留彩色 emoji 呈现
+        return img
+    }
+
     /// 每次展开菜单时重建，保证状态实时
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
 
         let header: String
-        if isResting { header = L10n.menuRestingHeader(max(0, restRemaining)) }
-        else if isPaused { header = L10n.menuPausedHeader(mmss(remaining)) }
-        else { header = L10n.menuWorkingHeader(mmss(remaining)) }
-        menu.addItem(NSMenuItem(title: header, action: nil, keyEquivalent: ""))
+        let headerEmoji: String
+        if isResting {
+            header = L10n.menuRestingHeader(max(0, restRemaining))
+            headerEmoji = "🌿"
+        } else if isPaused {
+            header = L10n.menuPausedHeader(mmss(remaining))
+            headerEmoji = "⏸️"
+        } else {
+            header = L10n.menuWorkingHeader(mmss(remaining))
+            headerEmoji = "☕"
+        }
+        let headerItem = NSMenuItem(title: header, action: nil, keyEquivalent: "")
+        headerItem.image = menuIcon(headerEmoji)
+        menu.addItem(headerItem)
         menu.addItem(.separator())
 
         let toggle = NSMenuItem(title: isPaused ? L10n.menuStart : L10n.menuPause,
                                 action: #selector(togglePause), keyEquivalent: "p")
         toggle.target = self
+        toggle.image = menuIcon(isPaused ? "▶️" : "⏸️")
         menu.addItem(toggle)
 
         let restNow = NSMenuItem(title: L10n.menuRestNow,
                                  action: #selector(restNow), keyEquivalent: "r")
         restNow.target = self
+        restNow.image = menuIcon("🌿")
         restNow.isEnabled = !isResting
         menu.addItem(restNow)
         menu.addItem(.separator())
@@ -745,6 +777,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             intervalMenu.addItem(it)
         }
         let intervalItem = NSMenuItem(title: L10n.menuInterval, action: nil, keyEquivalent: "")
+        intervalItem.image = menuIcon("⏱️")
         intervalItem.submenu = intervalMenu
         menu.addItem(intervalItem)
 
@@ -759,6 +792,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
             languageMenu.addItem(it)
         }
         let languageItem = NSMenuItem(title: L10n.menuLanguage, action: nil, keyEquivalent: "")
+        languageItem.image = menuIcon("🌐")
         languageItem.submenu = languageMenu
         menu.addItem(languageItem)
         menu.addItem(.separator())
@@ -766,16 +800,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate, UNUser
         let launch = NSMenuItem(title: L10n.menuLaunchAtLogin,
                                 action: #selector(toggleLaunchAtLogin), keyEquivalent: "l")
         launch.target = self
+        launch.image = menuIcon("🚀")
         launch.state = launchAtLoginEnabled ? .on : .off
         menu.addItem(launch)
         menu.addItem(.separator())
 
         let about = NSMenuItem(title: L10n.menuGitHub, action: #selector(openGitHubRepo), keyEquivalent: "")
         about.target = self
+        about.image = menuIcon("🔗")
         menu.addItem(about)
 
-        menu.addItem(NSMenuItem(title: L10n.menuQuit,
-                                action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        let quit = NSMenuItem(title: L10n.menuQuit,
+                              action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.image = menuIcon("🚪")
+        menu.addItem(quit)
     }
 
     @objc private func togglePause() {
